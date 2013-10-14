@@ -3,6 +3,8 @@ package scala.pickling
 import scala.pickling.internal._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe.Mirror
+import java.io.File
+import java.io.FileInputStream
 
 package object binary {
   implicit val pickleFormat = new BinaryPickleFormat
@@ -16,7 +18,10 @@ package binary {
     type PickleFormatType = BinaryPickleFormat
     override def toString = s"""BinaryPickle(${value.mkString("[", ",", "]")})"""
   }
-
+  case class FilePickle(value: File) extends Pickle {
+    type ValueType = File
+    type PickleFormatType = BinaryPickleFormat
+  }
   final class BinaryPickleBuilder(format: BinaryPickleFormat, out: EncodingOutput[Array[Byte]]) extends PBuilder with PickleTools {
     import format._
 
@@ -298,5 +303,233 @@ package binary {
     def createBuilder() = new BinaryPickleBuilder(this, null)
     def createBuilder(out: EncodingOutput[Array[Byte]]): PBuilder = new BinaryPickleBuilder(this, out)
     def createReader(pickle: PickleType, mirror: Mirror) = new BinaryPickleReader(pickle.value, mirror, this)
+	def createReader(pickle: FilePickle, mirror: Mirror) = new BinaryStreamReader(new FileInputStream(pickle.value), mirror, this)
+  }
+  
+  class BinaryStreamReader(stream: FileInputStream, val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
+    import format._
+
+    private val buffer2: Array[Byte] = new Array[Byte](2)
+    private val buffer4: Array[Byte] = new Array[Byte](4)
+    private val buffer8: Array[Byte] = new Array[Byte](8)
+    private var bufferN: Array[Byte] = null
+	private val srcOffset = UnsafeMemory.byteArrayOffset
+    private val destOffset = UnsafeMemory.intArrayOffset
+    private var lookaheaded: Option[Byte] = None
+
+    private var _lastTagRead: FastTypeTag[_] = null
+    private var _lastTypeStringRead: String = null
+
+    private def lastTagRead: FastTypeTag[_] =
+      if (_lastTagRead != null)
+        _lastTagRead
+      else {
+        // assume _lastTypeStringRead != null
+        _lastTagRead = FastTypeTag(mirror, _lastTypeStringRead)
+        _lastTagRead
+      }
+
+    private def decodeString(): String = {
+      if (lookaheaded == None) {
+          stream.read(buffer4)
+        } else {
+          buffer4(0) = lookaheaded.getOrElse(0)
+          stream.read(buffer4, 1, 3)
+          lookaheaded = None
+        }
+      val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+      stream.read(bufferN)
+      new String(bufferN, "UTF-8")
+    }
+    private def streamRead(x: Int) = {
+      if (x == 2) {
+        if (lookaheaded == None) {
+          stream.read(buffer2)
+        } else {
+          buffer2(0) = lookaheaded.getOrElse(0)
+          buffer2(1) = stream.read.toByte
+          lookaheaded = None
+        }
+      } else if (x == 4) {
+        if (lookaheaded == None) {
+          stream.read(buffer4)
+        } else {
+          buffer4(0) = lookaheaded.getOrElse(0)
+          stream.read(buffer4, 1, 3)
+          lookaheaded = None
+        }
+      } else if (x == 8) {
+        if (lookaheaded == None) {
+          stream.read(buffer8)
+        } else {
+          buffer8(0) = lookaheaded.getOrElse(0)
+          stream.read(buffer8, 1, 7)
+          lookaheaded = None
+        }
+      }
+    }
+    private def byteRead: Byte = {
+      if (lookaheaded == None) {
+        stream.read.toByte
+      } else {
+        val res: Byte = lookaheaded.getOrElse(0)
+        lookaheaded = None
+        res
+      }
+    }
+    def beginEntryNoTag(): String = {
+      val res: Any = withHints { hints =>
+        if (hints.isElidedType && nullablePrimitives.contains(hints.tag.key)) {
+          val lookahead = byteRead
+          lookahead match {
+            case NULL_TAG => FastTypeTag.Null
+            case REF_TAG => FastTypeTag.Ref
+            case _ => lookaheaded = Some(lookahead); hints.tag
+          }
+        } else if (hints.isElidedType && primitives.contains(hints.tag.key)) {
+          hints.tag
+        } else {
+          val lookahead = byteRead
+          lookahead match {
+            case NULL_TAG =>
+              FastTypeTag.Null
+            case ELIDED_TAG =>
+              hints.tag
+            case REF_TAG =>
+              FastTypeTag.Ref
+            case _ =>
+              lookaheaded = Some(lookahead)
+              decodeString
+          }
+        }
+      }
+      if (res.isInstanceOf[String]) {
+        _lastTagRead = null
+        _lastTypeStringRead = res.asInstanceOf[String]
+        _lastTypeStringRead
+      } else {
+        _lastTagRead = res.asInstanceOf[FastTypeTag[_]]
+        _lastTagRead.key
+      }
+    }
+
+    def beginEntry(): FastTypeTag[_] = {
+      beginEntryNoTag()
+      lastTagRead
+    }
+
+    def atPrimitive: Boolean = primitives.contains(lastTagRead.key)
+
+    def readPrimitive(): Any = lastTagRead.key match {
+      case KEY_NULL => null
+      case KEY_REF =>
+        streamRead(4); lookupUnpicklee((new ByteArray(buffer4)).decodeIntFrom(0))
+      case KEY_BYTE =>
+        byteRead
+      case KEY_SHORT =>
+        streamRead(2); (new ByteArray(buffer2)).decodeShortFrom(0)
+      case KEY_CHAR =>
+        streamRead(2); (new ByteArray(buffer2)).decodeCharFrom(0)
+      case KEY_INT =>
+        streamRead(4); (new ByteArray(buffer4)).decodeIntFrom(0)
+      case KEY_LONG =>
+        streamRead(8); (new ByteArray(buffer8)).decodeLongFrom(0)
+      case KEY_BOOLEAN =>
+        byteRead != 0
+      case KEY_FLOAT =>
+        streamRead(4)
+        val r = (new ByteArray(buffer4)).decodeIntFrom(0)
+        java.lang.Float.intBitsToFloat(r)
+      case KEY_DOUBLE =>
+        streamRead(8)
+        val r = (new ByteArray(buffer8)).decodeLongFrom(0)
+        java.lang.Double.longBitsToDouble(r)
+
+      case KEY_SCALA_STRING | KEY_JAVA_STRING =>
+        decodeString()
+
+      case KEY_ARRAY_BYTE =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 1)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 1)
+        ia
+      case KEY_ARRAY_SHORT =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 2)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 2)
+        ia
+      case KEY_ARRAY_CHAR =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 4)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
+        ia
+      case KEY_ARRAY_INT =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 4)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
+        ia
+      case KEY_ARRAY_LONG =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 8)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 8)
+        ia
+      case KEY_ARRAY_BOOLEAN =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 1)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 1)
+        ia
+      case KEY_ARRAY_FLOAT =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 4)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
+        ia
+      case KEY_ARRAY_DOUBLE =>
+        streamRead(4)
+        val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 8)
+        stream.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 8)
+        ia
+    }
+
+    def atObject: Boolean = !atPrimitive
+
+    def readField(name: String): BinaryStreamReader =
+      this
+
+    def endEntry(): Unit = { /* do nothing */ }
+
+    def beginCollection(): PReader = this
+
+    def readLength(): Int = {
+      streamRead(4)
+      (new ByteArray(buffer4)).decodeIntFrom(0)
+    }
+
+    def readElement(): PReader = this
+
+    def endCollection(): Unit = { /* do nothing */ }
   }
 }
