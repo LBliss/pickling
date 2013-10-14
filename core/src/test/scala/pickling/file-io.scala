@@ -1,4 +1,4 @@
-package scala.pickling.fileio
+package scala.pickling.binaryfileio
 
 import org.scalatest.FunSuite
 import java.io.File
@@ -6,54 +6,28 @@ import java.io.File
 import scala.io.Source
 import scala.pickling._
 import scala.pickling.internal._
-import scala.pickling.json._
-import scala.pickling.io.TextFileOutput
+import scala.pickling.binary._
+import scala.pickling.io.BinaryFileEncodedOutput
 
-case class Person(name: String)
-case class PersonNums(name: String, randNums: Array[Int])
+case class Person(name: String, age: Int, car: Option[String], child: Person)
 
 class FileIOTest extends FunSuite {
   test("simple") {
-    val p = Person("James")
+	val pp = Person("Junior", 12, None, null)
+	val p = Person("James", 45, Some("Ford"), pp)
 
-    val tmpFile = File.createTempFile("pickling", "fileoutput")
-    val fileOut = new TextFileOutput(tmpFile)
+	// RAM
+	val pickle1 = p.pickle
+	val unpickle1 = pickle1.unpickle[Person]
 
-    p.pickleTo(fileOut)
-    fileOut.close()
+	// FILE
+	val tmpFile = File.createTempFile("pickling", "fileoutput")
+	p.pickleTo(new BinaryFileEncodedOutput(tmpFile))
+	
+	val pickle2 = new FilePickle(tmpFile)
+	val unpickle2 = pickle2.unpickle[Person]
 
-    val fileContents = Source.fromFile(tmpFile).getLines.mkString("\n")
 
-    assert(fileContents == p.pickle.value)
-  }
-
-  test("simple-w-collection") {
-    val p = PersonNums("James", (1 to 200).toArray)
-
-    val tmpFile = File.createTempFile("pickling", "fileoutput")
-    val fileOut = new TextFileOutput(tmpFile)
-
-    p.pickleTo(fileOut)
-    fileOut.close()
-
-    val fileContents = Source.fromFile(tmpFile).getLines.mkString("\n")
-
-    assert(fileContents == p.pickle.value)
-  }
-
-  test("simple-w-collection-using-builder-directly") {
-    val p = PersonNums("James", (1 to 200).toArray)
-
-    val tmpFile = File.createTempFile("pickling", "fileoutput")
-    val fileOut = new TextFileOutput(tmpFile)
-
-    val builder = pickleFormat.createBuilder(fileOut)
-    p.pickleInto(builder)
-    clearPicklees() // TODO: need something more convenient here
-    fileOut.close()
-
-    val fileContents = Source.fromFile(tmpFile).getLines.mkString("\n")
-
-    assert(fileContents == p.pickle.value)
+    assert(unpickle1 == unpickle2)
   }
 }

@@ -303,7 +303,7 @@ package binary {
     def createBuilder() = new BinaryPickleBuilder(this, null)
     def createBuilder(out: EncodingOutput[Array[Byte]]): PBuilder = new BinaryPickleBuilder(this, out)
     def createReader(pickle: PickleType, mirror: Mirror) = new BinaryPickleReader(pickle.value, mirror, this)
-	def createReader(pickle: FilePickle, mirror: Mirror) = new BinaryStreamReader(new FileInputStream(pickle.value), mirror, this)
+    def createReader(pickle: FilePickle, mirror: Mirror) = new BinaryStreamReader(new FileInputStream(pickle.value), mirror, this)
   }
   
   class BinaryStreamReader(stream: FileInputStream, val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
@@ -313,7 +313,7 @@ package binary {
     private val buffer4: Array[Byte] = new Array[Byte](4)
     private val buffer8: Array[Byte] = new Array[Byte](8)
     private var bufferN: Array[Byte] = null
-	private val srcOffset = UnsafeMemory.byteArrayOffset
+    private val srcOffset = UnsafeMemory.byteArrayOffset
     private val destOffset = UnsafeMemory.intArrayOffset
     private var lookaheaded: Option[Byte] = None
 
@@ -330,14 +330,9 @@ package binary {
       }
 
     private def decodeString(): String = {
-      if (lookaheaded == None) {
-          stream.read(buffer4)
-        } else {
-          buffer4(0) = lookaheaded.getOrElse(0)
-          stream.read(buffer4, 1, 3)
-          lookaheaded = None
-        }
+      streamRead(4)
       val len = (new ByteArray(buffer4)).decodeIntFrom(0)
+      bufferN = new Array[Byte](len)
       stream.read(bufferN)
       new String(bufferN, "UTF-8")
     }
