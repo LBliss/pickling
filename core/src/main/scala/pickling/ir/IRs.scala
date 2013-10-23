@@ -37,7 +37,12 @@ class IRs[U <: Universe with Singleton](val uni: U) {
       case NoSymbol => NoSymbol
     }
     val ctorParams = if (ctor != NoSymbol) ctor.asMethod.paramss.flatten.map(_.asTerm) else Nil
-    val allAccessors = tp.declarations.collect{ case meth: MethodSymbol if meth.isAccessor || meth.isParamAccessor => meth }
+    val allAccessors = tp.declarations.collect{ case meth: MethodSymbol if meth.isAccessor || meth.isParamAccessor => meth }   
+    if (tp.toString.contains("Message")) {
+      println("generating IR for tpe " + tp.toString)
+      println(allAccessors.mkString("\n"))
+      println("base classes: " + tp.baseClasses)
+    }
     val (paramAccessors, otherAccessors) = allAccessors.partition(_.isParamAccessor)
 
     def mkFieldIR(sym: TermSymbol, param: Option[TermSymbol], accessor: Option[MethodSymbol]) = {

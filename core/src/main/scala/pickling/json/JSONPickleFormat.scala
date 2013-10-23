@@ -117,7 +117,8 @@ package json {
           }
         } else {
           appendLine("{")
-          if (!hints.isElidedType) append("\"tpe\": \"" + typeToString(hints.tag.tpe) + "\"")
+          val tpeName = picklee.getClass.getName
+          if (!hints.isElidedType) append("\"tpe\": \"" + /*typeToString(hints.tag.tpe)*/tpeName + "\"") //TODO
         }
       }
       this

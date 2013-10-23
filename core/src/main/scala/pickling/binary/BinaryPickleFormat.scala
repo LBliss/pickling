@@ -41,12 +41,14 @@ package binary {
         pos = pos + 5
       } else {
         if (!hints.isElidedType) {
-          val tpeBytes = hints.tag.key.getBytes("UTF-8")
+          //TODO: check if tag.key is from anon class
+          val tpeBytes = //hints.tag.key.getBytes("UTF-8")
+            picklee.getClass.getName.getBytes("UTF-8")
           byteBuffer.encodeIntAtEnd(pos, tpeBytes.length)
           pos += 4
           pos = byteBuffer.copyTo(pos, tpeBytes)
         }
-
+ 
         // NOTE: it looks like we don't have to write object ids at all
         // traversals employed by pickling and unpickling are exactly the same
         // hence when unpickling it's enough to just increment the nextUnpicklee counter
