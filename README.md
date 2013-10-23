@@ -5,34 +5,40 @@ scala/pickling
 
 Basic usage:
 
-    import scala.pickling._
-    import json._
+```scala
+import scala.pickling._
+import json._
 
-    val pckl = List(1, 2, 3, 4).pickle
-    val lst = pckl.unpickle[List[Int]]
+val pckl = List(1, 2, 3, 4).pickle
+val lst = pckl.unpickle[List[Int]]
+```
 
 For more, flip through, or watch the [ScalaDays 2013 presentation!](http://www.parleys.com/play/51c3799fe4b0d38b54f4625a/chapter0/about).
-<br> For deeper technical details, we've also written an OOPSLA 2013 paper on scala/pickling, [Instant Pickles: Generating Object-Oriented Pickler Combinators for Fast and Extensible Serialization](http://lampwww.epfl.ch/~hmiller/files/oopsla-pickling.pdf).
+<br> For deeper technical details, we've also written an OOPSLA 2013 paper on scala/pickling, [Instant Pickles: Generating Object-Oriented Pickler Combinators for Fast and Extensible Serialization](http://infoscience.epfl.ch/record/187787/files/oopsla-pickling_1.pdf).
 
 **Current version:** 0.8.0-SNAPSHOT. Scala/pickling does not yet have a stable release.
-<br>**Upcoming release:** Our first stable release, 0.8.0, is scheduled for September 11th.
+<br>**Upcoming release:** Our first stable release will be 0.8.0.
 
 ## Quick Start
 
 - make sure `scala-pickling.jar` is on your classpath
-- use Scala 2.10.2
+- use Scala 2.10.3
 
 ## Get Scala Pickling
 
-Scala Pickling for Scala 2.10.2 is available on Sonatype! You can find Scala Pickling under groupID: `org.scala-lang` and artifactID: `scala-pickling_2.10`. The current version is 0.8.0-SNAPSHOT.
+Scala Pickling for Scala 2.10.3 is available on Sonatype! You can find Scala Pickling under groupID: `org.scala-lang` and artifactID: `scala-pickling_2.10`. The current version is 0.8.0-SNAPSHOT.
 
 You can use Scala Pickling in your SBT project by simply adding the following dependency to your build file:
 
-    libraryDependencies += "org.scala-lang" %% "scala-pickling" % "0.8.0-SNAPSHOT"
+```scala
+libraryDependencies += "org.scala-lang" %% "scala-pickling" % "0.8.0-SNAPSHOT"
+```
 
 You also need to add the Sonatype "snapshots" repository resolver to your build file:
 
-    resolvers += Resolver.sonatypeRepo("snapshots")
+```scala
+resolvers += Resolver.sonatypeRepo("snapshots")
+```
 
 For a more illustrative example, see a [sample SBT project which uses Scala Pickling](https://github.com/xeno-by/sbt-example-pickling).
 
@@ -52,11 +58,11 @@ Scala Pickling...
 <!-- This project aims to turn [a custom build of macro paradise](https://github.com/heathermiller/scala-pickling/tree/topic/scala-pickling) that we used in
 [Object-Oriented Pickler Combinators and an Extensible Generation Framework](http://lampwww.epfl.ch/~hmiller/files/pickling.pdf)
 into a standalone library that targets 2.10.x
-(The library requires 2.10.2+).
+(The library requires 2.10.3+).
 
 Since we are making extensive use of quasiquotes, which cannot be added to 2.10.x due to binary and source compatibility
 restrictions, building (but not using!) scala-pickling requires [a custom build of scalac](http://docs.scala-lang.org/overviews/macros/paradise.html#macro_paradise_for_210x).
-Please note that scala-pickling can be used without any problems with vanilla scalac 2.10.2 -
+Please note that scala-pickling can be used without any problems with vanilla scalac 2.10.3 -
 custom scalac is only necessary to _build_ this library, not to compile against it or to link to it at runtime.
 
 Known limitations:
@@ -65,4 +71,3 @@ Known limitations:
   3. Picklers are generated directly at call sites, since we cannot have introduceTopLevel in 2.10.x.
   4. No runtime compilation, since it's not obvious how to package it without inducing a dependency on `scala-compiler.jar`.
  -->
- 
