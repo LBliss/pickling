@@ -52,7 +52,6 @@ class ByteArrayInput(value: Array[Byte]) extends BinaryInput {
 
 class BinaryFileInput(fis: FileInputStream) extends BinaryInput {
 
-  
   def read(obj: Array[Byte]): Unit = fis.read(obj)
   
   def read(obj: Array[Byte], off: Int, len: Int): Unit = fis.read(obj, off, len)

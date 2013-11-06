@@ -168,7 +168,6 @@ package binary {
       val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
       bufferN = new Array[Byte](len)
       input.read(bufferN)
-      println(new String(bufferN, "UTF-8"))
       new String(bufferN, "UTF-8")
     }
     private def streamRead(x: Int) = {

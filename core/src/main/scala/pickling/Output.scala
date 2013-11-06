@@ -1,5 +1,8 @@
 package scala.pickling
 
+import java.io.{File, PrintWriter}
+import scala.collection.mutable.ArrayBuffer
+
 trait Output[T] {
 
   def result(): T
@@ -53,4 +56,40 @@ class StringOutput extends Output[String] {
 
   override def toString = buf.toString
 
+}
+
+final class ByteArrayBinaryEncoder(arr: Array[Byte]) extends Output[Array[Byte]]  {
+
+  var pos = 0
+
+  def this(size: Int) {
+    this(Array.ofDim[Byte](size))
+  }
+
+  def result(): Array[Byte] =
+    arr
+
+  def put(obj: Array[Byte]): this.type = {
+    assert(obj.length + pos <= arr.length)
+    Array.copy(obj, 0, arr, pos, obj.length)
+    pos += obj.length
+    this
+  }
+  
+}
+
+final class ArrayBufferBinaryEncoder extends Output[Array[Byte]] {
+
+  private val buf = ArrayBuffer[Byte]()
+
+  var pos = 0
+
+  def result(): Array[Byte] =
+    buf.toArray
+
+  def put(obj: Array[Byte]): this.type = {
+    buf ++= obj
+    this
+  }
+  
 }
