@@ -20,31 +20,31 @@ package binary {
   final class BinaryPickleBuilder(format: BinaryPickleFormat, out: EncodingOutput[Array[Byte]]) extends PBuilder with PickleTools {
     import format._
 
-    private var BinaryEncoder: EncodingOutput[Array[Byte]] =
+    private var encoder: EncodingOutput[Array[Byte]] =
       out.asInstanceOf[EncodingOutput[Array[Byte]]]
 
     private var pos = 0
 
     @inline private[this] def mkBinaryEncoder(knownSize: Int): Unit =
-      if (BinaryEncoder == null) {
-        BinaryEncoder = if (knownSize != -1) new ByteArrayBinaryEncoder(knownSize) else new ArrayBufferBinaryEncoder
+      if (encoder == null) {
+        encoder = if (knownSize != -1) new ByteArrayBinaryEncoder(knownSize) else new ArrayBufferBinaryEncoder
       }
 
     @inline def beginEntry(picklee: Any): PBuilder = withHints { hints =>
       mkBinaryEncoder(hints.knownSize)
 
       if (picklee == null) {
-        pos = BinaryEncoder.encodeByteTo(pos, NULL_TAG)
+        pos = encoder.encodeByteTo(pos, NULL_TAG)
       } else if (hints.oid != -1) {
-        BinaryEncoder.encodeByteTo(pos, REF_TAG)
-        BinaryEncoder.encodeIntAtEnd(pos + 1, hints.oid)
+        encoder.encodeByteTo(pos, REF_TAG)
+        encoder.encodeIntAtEnd(pos + 1, hints.oid)
         pos = pos + 5
       } else {
         if (!hints.isElidedType) {
           val tpeBytes = hints.tag.key.getBytes("UTF-8")
-          BinaryEncoder.encodeIntAtEnd(pos, tpeBytes.length)
+          encoder.encodeIntAtEnd(pos, tpeBytes.length)
           pos += 4
-          pos = BinaryEncoder.copyTo(pos, tpeBytes)
+          pos = encoder.copyTo(pos, tpeBytes)
         }
 
         // NOTE: it looks like we don't have to write object ids at all
@@ -54,52 +54,52 @@ package binary {
 
         pos = hints.tag.key match { // PERF: should store typestring once in hints.
           case KEY_NULL =>
-            BinaryEncoder.encodeByteTo(pos, NULL_TAG)
+            encoder.encodeByteTo(pos, NULL_TAG)
           case KEY_BYTE =>
-            BinaryEncoder.encodeByteAtEnd(pos, picklee.asInstanceOf[Byte])
+            encoder.encodeByteAtEnd(pos, picklee.asInstanceOf[Byte])
             pos + 1
           case KEY_SHORT =>
-            BinaryEncoder.encodeShortAtEnd(pos, picklee.asInstanceOf[Short])
+            encoder.encodeShortAtEnd(pos, picklee.asInstanceOf[Short])
             pos + 2
           case KEY_CHAR =>
-            BinaryEncoder.encodeCharAtEnd(pos, picklee.asInstanceOf[Char])
+            encoder.encodeCharAtEnd(pos, picklee.asInstanceOf[Char])
             pos + 2
           case KEY_INT =>
-            BinaryEncoder.encodeIntAtEnd(pos, picklee.asInstanceOf[Int])
+            encoder.encodeIntAtEnd(pos, picklee.asInstanceOf[Int])
             pos + 4
           case KEY_LONG =>
-            BinaryEncoder.encodeLongAtEnd(pos, picklee.asInstanceOf[Long])
+            encoder.encodeLongAtEnd(pos, picklee.asInstanceOf[Long])
             pos + 8
           case KEY_BOOLEAN =>
-            BinaryEncoder.encodeBooleanTo(pos, picklee.asInstanceOf[Boolean])
+            encoder.encodeBooleanTo(pos, picklee.asInstanceOf[Boolean])
           case KEY_FLOAT =>
             val intValue = java.lang.Float.floatToRawIntBits(picklee.asInstanceOf[Float])
-            BinaryEncoder.encodeIntAtEnd(pos, intValue)
+            encoder.encodeIntAtEnd(pos, intValue)
             pos + 4
           case KEY_DOUBLE =>
             val longValue = java.lang.Double.doubleToRawLongBits(picklee.asInstanceOf[Double])
-            BinaryEncoder.encodeLongAtEnd(pos, longValue)
+            encoder.encodeLongAtEnd(pos, longValue)
             pos + 8
           case KEY_SCALA_STRING | KEY_JAVA_STRING =>
-            BinaryEncoder.encodeStringTo(pos, picklee.asInstanceOf[String])
+            encoder.encodeStringTo(pos, picklee.asInstanceOf[String])
           case KEY_ARRAY_BYTE =>
-            BinaryEncoder.encodeByteArrayTo(pos, picklee.asInstanceOf[Array[Byte]])
+            encoder.encodeByteArrayTo(pos, picklee.asInstanceOf[Array[Byte]])
           case KEY_ARRAY_CHAR =>
-            BinaryEncoder.encodeCharArrayTo(pos, picklee.asInstanceOf[Array[Char]])
+            encoder.encodeCharArrayTo(pos, picklee.asInstanceOf[Array[Char]])
           case KEY_ARRAY_SHORT =>
-            BinaryEncoder.encodeShortArrayTo(pos, picklee.asInstanceOf[Array[Short]])
+            encoder.encodeShortArrayTo(pos, picklee.asInstanceOf[Array[Short]])
           case KEY_ARRAY_INT =>
-            BinaryEncoder.encodeIntArrayTo(pos, picklee.asInstanceOf[Array[Int]])
+            encoder.encodeIntArrayTo(pos, picklee.asInstanceOf[Array[Int]])
           case KEY_ARRAY_LONG =>
-            BinaryEncoder.encodeLongArrayTo(pos, picklee.asInstanceOf[Array[Long]])
+            encoder.encodeLongArrayTo(pos, picklee.asInstanceOf[Array[Long]])
           case KEY_ARRAY_BOOLEAN =>
-            BinaryEncoder.encodeBooleanArrayTo(pos, picklee.asInstanceOf[Array[Boolean]])
+            encoder.encodeBooleanArrayTo(pos, picklee.asInstanceOf[Array[Boolean]])
           case KEY_ARRAY_FLOAT =>
-            BinaryEncoder.encodeFloatArrayTo(pos, picklee.asInstanceOf[Array[Float]])
+            encoder.encodeFloatArrayTo(pos, picklee.asInstanceOf[Array[Float]])
           case KEY_ARRAY_DOUBLE =>
-            BinaryEncoder.encodeDoubleArrayTo(pos, picklee.asInstanceOf[Array[Double]])
+            encoder.encodeDoubleArrayTo(pos, picklee.asInstanceOf[Array[Double]])
           case _ =>
-            if (hints.isElidedType) BinaryEncoder.encodeByteTo(pos, ELIDED_TAG)
+            if (hints.isElidedType) encoder.encodeByteTo(pos, ELIDED_TAG)
             else pos
         }
       }
@@ -119,7 +119,7 @@ package binary {
 
     @inline def beginCollection(length: Int): PBuilder = {
       beginCollPos = pos :: beginCollPos
-      BinaryEncoder.encodeIntAtEnd(pos, 0)
+      encoder.encodeIntAtEnd(pos, 0)
       pos += 4
       this
     }
@@ -132,11 +132,11 @@ package binary {
     @inline def endCollection(length: Int): Unit = {
       val localBeginCollPos = beginCollPos.head
       beginCollPos = beginCollPos.tail
-      BinaryEncoder.encodeIntTo(localBeginCollPos, length)
+      encoder.encodeIntTo(localBeginCollPos, length)
     }
 
     @inline def result() = {
-      BinaryPickle(BinaryEncoder.result())
+      BinaryPickle(encoder.result())
     }
   }
 
@@ -290,7 +290,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 2)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Short](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 2)
         ia
       case KEY_ARRAY_CHAR =>
@@ -298,7 +298,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 4)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Char](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
         ia
       case KEY_ARRAY_INT =>
@@ -306,7 +306,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 4)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Int](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
         ia
       case KEY_ARRAY_LONG =>
@@ -314,7 +314,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 8)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Long](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 8)
         ia
       case KEY_ARRAY_BOOLEAN =>
@@ -322,7 +322,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 1)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Boolean](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 1)
         ia
       case KEY_ARRAY_FLOAT =>
@@ -330,7 +330,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 4)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Float](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
         ia
       case KEY_ARRAY_DOUBLE =>
@@ -338,7 +338,7 @@ package binary {
         val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
         bufferN = new Array[Byte](len * 8)
         input.read(bufferN)
-        val ia = Array.ofDim[Byte](len)
+        val ia = Array.ofDim[Double](len)
         UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 8)
         ia
     }

@@ -38,7 +38,7 @@ class ByteArrayInput(value: Array[Byte]) extends BinaryInput {
   }
   
   def read(obj: Array[Byte], off: Int, len: Int): Unit = {
-    assert(obj.length + pos <= value.length)
+    assert(len + pos <= value.length)
     Array.copy(buf, pos, obj, off, len)
     pos += len
   }
