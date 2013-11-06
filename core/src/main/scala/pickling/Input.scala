@@ -12,13 +12,10 @@ trait Input[T] {
   def read(): T
   
   // To unpickle from an Input.
-  type PickleFormatType
   def unpickle[X] = macro Compat.UnpickleMacros_pickleUnpickle[X]
 }
 
 trait BinaryInput extends Input[Array[Byte]] {
-
-  type PickleFormatType = scala.pickling.binary.BinaryPickleFormat
   
   def read(obj: Array[Byte]): Unit
   
@@ -43,7 +40,7 @@ class ByteArrayInput(value: Array[Byte]) extends BinaryInput {
   def read(obj: Array[Byte], off: Int, len: Int): Unit = {
     assert(obj.length + pos <= value.length)
     Array.copy(buf, pos, obj, off, len)
-    pos += obj.length
+    pos += len
   }
   
   def readByte(): Byte = {
