@@ -140,13 +140,19 @@ package binary {
     }
   }
 
-  class BinaryPickleReader(arr: Array[Byte], val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
+  class BinaryStreamReader(input: ByteArrayInput, val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
     import format._
 
-    private val BinaryEncoder: BinaryEncoder       = new ByteArrayBinaryEncoder(arr)
-    private var pos                          = 0
+    private val buffer2: Array[Byte] = new Array[Byte](2)
+    private val buffer4: Array[Byte] = new Array[Byte](4)
+    private val buffer8: Array[Byte] = new Array[Byte](8)
+    private var bufferN: Array[Byte] = null
+    private val srcOffset = UnsafeMemory.byteArrayOffset
+    private val destOffset = UnsafeMemory.intArrayOffset
+    private var lookaheaded: Option[Byte] = None
+
     private var _lastTagRead: FastTypeTag[_] = null
-    private var _lastTypeStringRead: String  = null
+    private var _lastTypeStringRead: String = null
 
     private def lastTagRead: FastTypeTag[_] =
       if (_lastTagRead != null)
@@ -157,33 +163,72 @@ package binary {
         _lastTagRead
       }
 
+    private def decodeString(): String = {
+      streamRead(4)
+      val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+      bufferN = new Array[Byte](len)
+      input.read(bufferN)
+      new String(bufferN, "UTF-8")
+    }
+    private def streamRead(x: Int) = {
+      if (x == 2) {
+        if (lookaheaded == None) {
+          input.read(buffer2)
+        } else {
+          buffer2(0) = lookaheaded.getOrElse(0)
+          buffer2(1) = input.readByte
+          lookaheaded = None
+        }
+      } else if (x == 4) {
+        if (lookaheaded == None) {
+          input.read(buffer4)
+        } else {
+          buffer4(0) = lookaheaded.getOrElse(0)
+          input.read(buffer4, 1, 3)
+          lookaheaded = None
+        }
+      } else if (x == 8) {
+        if (lookaheaded == None) {
+          input.read(buffer8)
+        } else {
+          buffer8(0) = lookaheaded.getOrElse(0)
+          input.read(buffer8, 1, 7)
+          lookaheaded = None
+        }
+      }
+    }
+    private def byteRead: Byte = {
+      if (lookaheaded == None) {
+        input.readByte
+      } else {
+        val res: Byte = lookaheaded.getOrElse(0)
+        lookaheaded = None
+        res
+      }
+    }
     def beginEntryNoTag(): String = {
       val res: Any = withHints { hints =>
         if (hints.isElidedType && nullablePrimitives.contains(hints.tag.key)) {
-          val lookahead = BinaryEncoder.decodeByteFrom(pos)
+          val lookahead = byteRead
           lookahead match {
-            case NULL_TAG => pos += 1; FastTypeTag.Null
-            case REF_TAG  => pos += 1; FastTypeTag.Ref
-            case _        => hints.tag
+            case NULL_TAG => FastTypeTag.Null
+            case REF_TAG => FastTypeTag.Ref
+            case _ => lookaheaded = Some(lookahead); hints.tag
           }
         } else if (hints.isElidedType && primitives.contains(hints.tag.key)) {
           hints.tag
         } else {
-          val lookahead = BinaryEncoder.decodeByteFrom(pos)
+          val lookahead = byteRead
           lookahead match {
             case NULL_TAG =>
-              pos += 1
               FastTypeTag.Null
             case ELIDED_TAG =>
-              pos += 1
               hints.tag
             case REF_TAG =>
-              pos += 1
               FastTypeTag.Ref
             case _ =>
-              val (typeString, newpos) = BinaryEncoder.decodeStringFrom(pos)
-              pos = newpos
-              typeString
+              lookaheaded = Some(lookahead)
+              decodeString
           }
         }
       }
@@ -204,45 +249,103 @@ package binary {
 
     def atPrimitive: Boolean = primitives.contains(lastTagRead.key)
 
-    def readPrimitive(): Any = {
-      var newpos = pos
-      val res = lastTagRead.key match {
-          case KEY_NULL    => null
-          case KEY_REF     => newpos = pos+4 ; lookupUnpicklee(BinaryEncoder.decodeIntFrom(pos))
-          case KEY_BYTE    => newpos = pos+1 ; BinaryEncoder.decodeByteFrom(pos)
-          case KEY_SHORT   => newpos = pos+2 ; BinaryEncoder.decodeShortFrom(pos)
-          case KEY_CHAR    => newpos = pos+2 ; BinaryEncoder.decodeCharFrom(pos)
-          case KEY_INT     => newpos = pos+4 ; BinaryEncoder.decodeIntFrom(pos)
-          case KEY_LONG    => newpos = pos+8 ; BinaryEncoder.decodeLongFrom(pos)
-          case KEY_BOOLEAN => newpos = pos+1 ; BinaryEncoder.decodeBooleanFrom(pos)
-          case KEY_FLOAT   =>
-            val r = BinaryEncoder.decodeIntFrom(pos)
-            newpos = pos+4
-            java.lang.Float.intBitsToFloat(r)
-          case KEY_DOUBLE  =>
-            val r = BinaryEncoder.decodeLongFrom(pos)
-            newpos = pos+8
-            java.lang.Double.longBitsToDouble(r)
+    def readPrimitive(): Any = lastTagRead.key match {
+      case KEY_NULL => null
+      case KEY_REF =>
+        streamRead(4); lookupUnpicklee((new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0))
+      case KEY_BYTE =>
+        byteRead
+      case KEY_SHORT =>
+        streamRead(2); (new ByteArrayBinaryEncoder(buffer2)).decodeShortFrom(0)
+      case KEY_CHAR =>
+        streamRead(2); (new ByteArrayBinaryEncoder(buffer2)).decodeCharFrom(0)
+      case KEY_INT =>
+        streamRead(4); (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+      case KEY_LONG =>
+        streamRead(8); (new ByteArrayBinaryEncoder(buffer8)).decodeLongFrom(0)
+      case KEY_BOOLEAN =>
+        byteRead != 0
+      case KEY_FLOAT =>
+        streamRead(4)
+        val r = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        java.lang.Float.intBitsToFloat(r)
+      case KEY_DOUBLE =>
+        streamRead(8)
+        val r = (new ByteArrayBinaryEncoder(buffer8)).decodeLongFrom(0)
+        java.lang.Double.longBitsToDouble(r)
 
-          case KEY_SCALA_STRING | KEY_JAVA_STRING => val r = BinaryEncoder.decodeStringFrom(pos); newpos = r._2 ; r._1
+      case KEY_SCALA_STRING | KEY_JAVA_STRING =>
+        decodeString()
 
-          case KEY_ARRAY_BYTE => val r = BinaryEncoder.decodeByteArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_SHORT => val r = BinaryEncoder.decodeShortArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_CHAR => val r = BinaryEncoder.decodeCharArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_INT => val r = BinaryEncoder.decodeIntArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_LONG => val r = BinaryEncoder.decodeLongArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_BOOLEAN => val r = BinaryEncoder.decodeBooleanArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_FLOAT => val r = BinaryEncoder.decodeFloatArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_DOUBLE => val r = BinaryEncoder.decodeDoubleArrayFrom(pos); newpos = r._2 ; r._1
-      }
-
-      pos = newpos
-      res
+      case KEY_ARRAY_BYTE =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 1)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 1)
+        ia
+      case KEY_ARRAY_SHORT =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 2)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 2)
+        ia
+      case KEY_ARRAY_CHAR =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 4)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
+        ia
+      case KEY_ARRAY_INT =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 4)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
+        ia
+      case KEY_ARRAY_LONG =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 8)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 8)
+        ia
+      case KEY_ARRAY_BOOLEAN =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 1)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 1)
+        ia
+      case KEY_ARRAY_FLOAT =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 4)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 4)
+        ia
+      case KEY_ARRAY_DOUBLE =>
+        streamRead(4)
+        val len = (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
+        bufferN = new Array[Byte](len * 8)
+        input.read(bufferN)
+        val ia = Array.ofDim[Byte](len)
+        UnsafeMemory.unsafe.copyMemory(bufferN, srcOffset, ia, destOffset, len * 8)
+        ia
     }
 
     def atObject: Boolean = !atPrimitive
 
-    def readField(name: String): BinaryPickleReader =
+    def readField(name: String): BinaryStreamReader =
       this
 
     def endEntry(): Unit = { /* do nothing */ }
@@ -250,16 +353,15 @@ package binary {
     def beginCollection(): PReader = this
 
     def readLength(): Int = {
-      val length = BinaryEncoder.decodeIntFrom(pos)
-      pos += 4
-      length
+      streamRead(4)
+      (new ByteArrayBinaryEncoder(buffer4)).decodeIntFrom(0)
     }
 
     def readElement(): PReader = this
 
     def endCollection(): Unit = { /* do nothing */ }
   }
-
+  
   class BinaryPickleFormat extends PickleFormat {
     val ELIDED_TAG: Byte = -1
     val NULL_TAG: Byte = -2
@@ -297,6 +399,7 @@ package binary {
     type OutputType = EncodingOutput[Array[Byte]]
     def createBuilder() = new BinaryPickleBuilder(this, null)
     def createBuilder(out: EncodingOutput[Array[Byte]]): PBuilder = new BinaryPickleBuilder(this, out)
-    def createReader(pickle: PickleType, mirror: Mirror) = new BinaryPickleReader(pickle.value, mirror, this)
+    // def createReader(pickle: PickleType, mirror: Mirror) = new BinaryPickleReader(pickle.value, mirror, this)
+    def createReader(pickle: PickleType, mirror: Mirror) = new BinaryStreamReader(new ByteArrayInput(pickle.value), mirror, this)
   }
 }
