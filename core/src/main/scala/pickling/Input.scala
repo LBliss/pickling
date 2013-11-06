@@ -1,5 +1,7 @@
 package scala.pickling
 
+import scala.language.experimental.macros
+
 import java.io.FileInputStream
 
 trait Input[T] {
@@ -8,10 +10,16 @@ trait Input[T] {
   def read(obj: T): Unit
   // Direct read.
   def read(): T
+  
+  // To unpickle from an Input.
+  type PickleFormatType
+  def unpickle[X] = macro Compat.UnpickleMacros_pickleUnpickle[X]
 }
 
 trait BinaryInput extends Input[Array[Byte]] {
 
+  type PickleFormatType = scala.pickling.binary.BinaryPickleFormat
+  
   def read(obj: Array[Byte]): Unit
   
   def read(obj: Array[Byte], off: Int, len: Int): Unit
@@ -47,6 +55,7 @@ class ByteArrayInput(value: Array[Byte]) extends BinaryInput {
 
 class BinaryFileInput(fis: FileInputStream) extends BinaryInput {
 
+  
   def read(obj: Array[Byte]): Unit = fis.read(obj)
   
   def read(obj: Array[Byte], off: Int, len: Int): Unit = fis.read(obj, off, len)

@@ -22,6 +22,7 @@ package json {
   class JSONPickleFormat extends PickleFormat {
     type PickleType = JSONPickle
     type OutputType = Output[String]
+    type InputType = Input[String]
     def createBuilder() = new JSONPickleBuilder(this, new StringOutput)
     def createBuilder(out: Output[String]): PBuilder = new JSONPickleBuilder(this, out)
     def createReader(pickle: JSONPickle, mirror: Mirror) = {
@@ -30,6 +31,7 @@ package json {
         case None => throw new PicklingException("failed to parse \"" + pickle.value + "\" as JSON")
       }
     }
+    def createReader(input: InputType, mirror: Mirror) = ??? // Incremental JSON reader NOT implemented
   }
 
   class JSONPickleBuilder(format: JSONPickleFormat, buf: Output[String]) extends PBuilder with PickleTools {

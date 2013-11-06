@@ -396,10 +396,12 @@ package binary {
     val nullablePrimitives = Set(KEY_NULL, KEY_SCALA_STRING, KEY_JAVA_STRING, KEY_ARRAY_BYTE, KEY_ARRAY_SHORT, KEY_ARRAY_CHAR, KEY_ARRAY_INT, KEY_ARRAY_LONG, KEY_ARRAY_BOOLEAN, KEY_ARRAY_FLOAT, KEY_ARRAY_DOUBLE)
 
     type PickleType = BinaryPickle
+    type InputType = BinaryInput
     type OutputType = EncodingOutput[Array[Byte]]
+    
     def createBuilder() = new BinaryPickleBuilder(this, null)
     def createBuilder(out: EncodingOutput[Array[Byte]]): PBuilder = new BinaryPickleBuilder(this, out)
-    // def createReader(pickle: PickleType, mirror: Mirror) = new BinaryPickleReader(pickle.value, mirror, this)
     def createReader(pickle: PickleType, mirror: Mirror) = new BinaryStreamReader(new ByteArrayInput(pickle.value), mirror, this)
+    def createReader(input: InputType, mirror: Mirror) = new BinaryStreamReader(input, mirror, this)
   }
 }
