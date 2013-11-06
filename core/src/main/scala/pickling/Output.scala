@@ -73,7 +73,7 @@ class TextFileOutput(file: File) extends Output[String] {
 
 }
 
-class ByteArrayOutput(arr: Array[Byte]) extends Output[Array[Byte]]  {
+/*class ByteArrayOutput(arr: Array[Byte]) extends Output[Array[Byte]]  {
 
   private var pos = 0
 
@@ -121,3 +121,4 @@ class BinaryFileOutput(file: File) extends Output[Array[Byte]] {
   def close(): Unit = writer.close()
   
 }
+*/
