@@ -15,9 +15,9 @@ trait Pickle {
 trait PickleFormat {
   type PickleType <: Pickle
   type OutputType
-  type InputType
+  //type InputType
   def createBuilder(): PBuilder
   def createBuilder(out: OutputType): PBuilder
   def createReader(pickle: PickleType, mirror: Mirror): PReader
-  def createReader(input: InputType, mirror: Mirror): PReader
+  //def createReader(input: InputType, mirror: Mirror): PReader
 }
