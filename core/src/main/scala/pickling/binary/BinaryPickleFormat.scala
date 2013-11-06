@@ -140,7 +140,7 @@ package binary {
     }
   }
 
-  class BinaryStreamReader(input: ByteArrayInput, val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
+  class BinaryStreamReader(input: BinaryInput, val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
     import format._
 
     private val buffer2: Array[Byte] = new Array[Byte](2)
