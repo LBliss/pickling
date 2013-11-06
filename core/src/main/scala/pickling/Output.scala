@@ -1,6 +1,6 @@
 package scala.pickling
 
-import java.io.{File, PrintWriter}
+import java.io.{File, PrintWriter, FileOutputStream}
 import scala.collection.mutable.ArrayBuffer
 
 trait Output[T] {
@@ -40,7 +40,6 @@ trait EncodingOutput[T] extends Output[T] {
   def copyTo(pos: Int, bytes: Array[Byte]): Int
 }
 
-
 class StringOutput extends Output[String] {
 
   private val buf =
@@ -58,9 +57,25 @@ class StringOutput extends Output[String] {
 
 }
 
-final class ByteArrayBinaryEncoder(arr: Array[Byte]) extends Output[Array[Byte]]  {
+class TextFileOutput(file: File) extends Output[String] {
 
-  var pos = 0
+  private val writer = new PrintWriter(file)
+
+  def result(): String =
+    ???
+
+  def put(obj: String): this.type = {
+    writer.print(obj)
+    this
+  }
+
+  def close(): Unit = writer.close()
+
+}
+
+class ByteArrayOutput(arr: Array[Byte]) extends Output[Array[Byte]]  {
+
+  private var pos = 0
 
   def this(size: Int) {
     this(Array.ofDim[Byte](size))
@@ -75,14 +90,12 @@ final class ByteArrayBinaryEncoder(arr: Array[Byte]) extends Output[Array[Byte]]
     pos += obj.length
     this
   }
-  
 }
 
-final class ArrayBufferBinaryEncoder extends Output[Array[Byte]] {
+class ArrayBufferOutput extends Output[Array[Byte]] {
 
+  private var pos = 0
   private val buf = ArrayBuffer[Byte]()
-
-  var pos = 0
 
   def result(): Array[Byte] =
     buf.toArray
@@ -91,5 +104,20 @@ final class ArrayBufferBinaryEncoder extends Output[Array[Byte]] {
     buf ++= obj
     this
   }
+}
+
+class BinaryFileOutput(file: File) extends Output[Array[Byte]] {
+
+  private val writer = new FileOutputStream(file)
+
+  def result(): Array[Byte] =
+    ???
+
+  def put(obj: Array[Byte]): this.type = {
+    writer.write(obj)
+    this
+  }
+
+  def close(): Unit = writer.close()
   
 }

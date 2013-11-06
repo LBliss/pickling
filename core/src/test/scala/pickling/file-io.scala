@@ -7,7 +7,6 @@ import scala.io.Source
 import scala.pickling._
 import scala.pickling.internal._
 import scala.pickling.json._
-import scala.pickling.io.TextFileOutput
 
 case class Person(name: String)
 case class PersonNums(name: String, randNums: Array[Int])
