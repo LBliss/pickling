@@ -17,90 +17,110 @@ package binary {
     override def toString = s"""BinaryPickle(${value.mkString("[", ",", "]")})"""
   }
 
-  final class BinaryPickleBuilder(format: BinaryPickleFormat, out: EncodingOutput[Array[Byte]]) extends PBuilder with PickleTools {
+  final class BinaryPickleBuilder(format: BinaryPickleFormat, output: Output[Array[Byte]]) extends PBuilder with PickleTools {
     import format._
 
-    private var encoder: EncodingOutput[Array[Byte]] =
-      out.asInstanceOf[EncodingOutput[Array[Byte]]]
-
-    private var pos = 0
-
-    @inline private[this] def mkBinaryEncoder(knownSize: Int): Unit =
-      if (encoder == null) {
-        encoder = if (knownSize != -1) new ByteArrayBinaryEncoder(knownSize) else new ArrayBufferBinaryEncoder
+    private var out: Output[Array[Byte]] = output
+    private val buffer1: Array[Byte] = new Array[Byte](1)
+    private val buffer2: Array[Byte] = new Array[Byte](2)
+    private val buffer4: Array[Byte] = new Array[Byte](4)
+    private val buffer8: Array[Byte] = new Array[Byte](8)
+    private var bufferN: Array[Byte] = null
+    
+    @inline private[this] def mkOutput(knownSize: Int): Unit =
+      if (out == null) {
+        out = if (knownSize != -1) new ByteArrayOutput(knownSize) else new ArrayBufferOutput
       }
 
     @inline def beginEntry(picklee: Any): PBuilder = withHints { hints =>
-      mkBinaryEncoder(hints.knownSize)
-
+      mkOutput(hints.knownSize)
       if (picklee == null) {
-        pos = encoder.encodeByteTo(pos, NULL_TAG)
+        out.put(Util.encodeByte(buffer1, NULL_TAG))
       } else if (hints.oid != -1) {
-        encoder.encodeByteTo(pos, REF_TAG)
-        encoder.encodeIntAtEnd(pos + 1, hints.oid)
-        pos = pos + 5
+        out.put(Util.encodeByte(buffer1, REF_TAG))
+        out.put(Util.encodeInt(buffer4, hints.oid))
       } else {
         if (!hints.isElidedType) {
           val tpeBytes = hints.tag.key.getBytes("UTF-8")
-          encoder.encodeIntAtEnd(pos, tpeBytes.length)
-          pos += 4
-          pos = encoder.copyTo(pos, tpeBytes)
+          out.put(Util.encodeInt(buffer4, tpeBytes.length))
+          out.put(tpeBytes)
         }
 
-        // NOTE: it looks like we don't have to write object ids at all
-        // traversals employed by pickling and unpickling are exactly the same
-        // hence when unpickling it's enough to just increment the nextUnpicklee counter
-        // and everything will work out automatically!
-
-        pos = hints.tag.key match { // PERF: should store typestring once in hints.
+        hints.tag.key match { // PERF: should store typestring once in hints.
           case KEY_NULL =>
-            encoder.encodeByteTo(pos, NULL_TAG)
+            out.put(Util.encodeByte(buffer1, NULL_TAG))
           case KEY_BYTE =>
-            encoder.encodeByteAtEnd(pos, picklee.asInstanceOf[Byte])
-            pos + 1
+            out.put(Util.encodeByte(buffer1, picklee.asInstanceOf[Byte]))
           case KEY_SHORT =>
-            encoder.encodeShortAtEnd(pos, picklee.asInstanceOf[Short])
-            pos + 2
+            out.put(Util.encodeShort(buffer2, picklee.asInstanceOf[Short]))
           case KEY_CHAR =>
-            encoder.encodeCharAtEnd(pos, picklee.asInstanceOf[Char])
-            pos + 2
+            out.put(Util.encodeChar(buffer2, picklee.asInstanceOf[Char]))
           case KEY_INT =>
-            encoder.encodeIntAtEnd(pos, picklee.asInstanceOf[Int])
-            pos + 4
+            out.put(Util.encodeInt(buffer4, picklee.asInstanceOf[Int]))
           case KEY_LONG =>
-            encoder.encodeLongAtEnd(pos, picklee.asInstanceOf[Long])
-            pos + 8
+            out.put(Util.encodeLong(buffer8, picklee.asInstanceOf[Long]))
           case KEY_BOOLEAN =>
-            encoder.encodeBooleanTo(pos, picklee.asInstanceOf[Boolean])
+            out.put(Util.encodeBoolean(buffer1, picklee.asInstanceOf[Boolean]))
           case KEY_FLOAT =>
             val intValue = java.lang.Float.floatToRawIntBits(picklee.asInstanceOf[Float])
-            encoder.encodeIntAtEnd(pos, intValue)
-            pos + 4
+            out.put(Util.encodeInt(buffer4, intValue))
           case KEY_DOUBLE =>
             val longValue = java.lang.Double.doubleToRawLongBits(picklee.asInstanceOf[Double])
-            encoder.encodeLongAtEnd(pos, longValue)
-            pos + 8
+            out.put(Util.encodeLong(buffer8, longValue))
           case KEY_SCALA_STRING | KEY_JAVA_STRING =>
-            encoder.encodeStringTo(pos, picklee.asInstanceOf[String])
+            val bytes = picklee.asInstanceOf[String].getBytes("UTF-8")
+            out.put(Util.encodeInt(buffer4, bytes.length))
+            out.put(bytes)
           case KEY_ARRAY_BYTE =>
-            encoder.encodeByteArrayTo(pos, picklee.asInstanceOf[Array[Byte]])
+            val src = picklee.asInstanceOf[Array[Byte]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.byteArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_CHAR =>
-            encoder.encodeCharArrayTo(pos, picklee.asInstanceOf[Array[Char]])
+            val src = picklee.asInstanceOf[Array[Char]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length*4)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.charArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_SHORT =>
-            encoder.encodeShortArrayTo(pos, picklee.asInstanceOf[Array[Short]])
+            val src = picklee.asInstanceOf[Array[Short]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length*2)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.shortArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_INT =>
-            encoder.encodeIntArrayTo(pos, picklee.asInstanceOf[Array[Int]])
+            val src = picklee.asInstanceOf[Array[Int]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length*4)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.intArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_LONG =>
-            encoder.encodeLongArrayTo(pos, picklee.asInstanceOf[Array[Long]])
+            val src = picklee.asInstanceOf[Array[Long]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length*8)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.longArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_BOOLEAN =>
-            encoder.encodeBooleanArrayTo(pos, picklee.asInstanceOf[Array[Boolean]])
+            val src = picklee.asInstanceOf[Array[Boolean]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.booleanArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_FLOAT =>
-            encoder.encodeFloatArrayTo(pos, picklee.asInstanceOf[Array[Float]])
+            val src = picklee.asInstanceOf[Array[Float]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length*4)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.floatArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case KEY_ARRAY_DOUBLE =>
-            encoder.encodeDoubleArrayTo(pos, picklee.asInstanceOf[Array[Double]])
+            val src = picklee.asInstanceOf[Array[Double]]
+            out.put(Util.encodeInt(buffer4, src.length))
+            bufferN = new Array[Byte](src.length*8)
+            UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.doubleArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
+            out.put(bufferN)
           case _ =>
-            if (hints.isElidedType) encoder.encodeByteTo(pos, ELIDED_TAG)
-            else pos
+            if (hints.isElidedType) out.put(Util.encodeByte(buffer1, ELIDED_TAG))
         }
       }
 
@@ -115,12 +135,8 @@ package binary {
 
     @inline def endEntry(): Unit = { /* do nothing */ }
 
-    var beginCollPos = List[Int]()
-
     @inline def beginCollection(length: Int): PBuilder = {
-      beginCollPos = pos :: beginCollPos
-      encoder.encodeIntAtEnd(pos, 0)
-      pos += 4
+      out.put(Util.encodeInt(buffer4, length))
       this
     }
 
@@ -130,13 +146,12 @@ package binary {
     }
 
     @inline def endCollection(length: Int): Unit = {
-      val localBeginCollPos = beginCollPos.head
-      beginCollPos = beginCollPos.tail
-      encoder.encodeIntTo(localBeginCollPos, length)
+      // TODO: Length may change between begin and end... this is bad
+      // byteBuffer.encodeIntTo(localBeginCollPos, length) // Really?
     }
 
     @inline def result() = {
-      BinaryPickle(encoder.result())
+      BinaryPickle(out.result)
     }
   }
 
@@ -397,10 +412,10 @@ package binary {
 
     type PickleType = BinaryPickle
     type InputType = BinaryInput
-    type OutputType = EncodingOutput[Array[Byte]]
+    type OutputType = Output[Array[Byte]]
     
     def createBuilder() = new BinaryPickleBuilder(this, null)
-    def createBuilder(out: EncodingOutput[Array[Byte]]): PBuilder = new BinaryPickleBuilder(this, out)
+    def createBuilder(out: Output[Array[Byte]]): PBuilder = new BinaryPickleBuilder(this, out)
     def createReader(pickle: PickleType, mirror: Mirror) = new BinaryStreamReader(new ByteArrayInput(pickle.value), mirror, this)
     def createReader(input: InputType, mirror: Mirror) = new BinaryStreamReader(input, mirror, this)
   }

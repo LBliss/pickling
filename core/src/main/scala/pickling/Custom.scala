@@ -95,8 +95,9 @@ trait LowPriorityPicklersUnpicklers {
       if (elemTag == FastTypeTag.Int) builder.hintKnownSize(coll.size * 4 + 100)
       builder.beginEntry(coll)
 
-      if (coll.isInstanceOf[IndexedSeq[_]]) builder.beginCollection(coll.size)
-      else builder.beginCollection(0)
+      builder.beginCollection(coll.size)
+      // if (coll.isInstanceOf[IndexedSeq[_]]) builder.beginCollection(coll.size)
+      // else builder.beginCollection(0) // Why... :( ?
 
       if (isPrimitive) {
         builder.hintStaticallyElidedType()

@@ -11,6 +11,11 @@ package binary {
       Array.copy(arr, 0, target, pos, arr.length)
     }
 
+    def copy(target: Array[Byte], arr: Array[Byte]): Unit = {
+      // def copy(src: Object, srcPos: Int, dest: Object, destPos: Int, length: Int)
+      Array.copy(arr, 0, target, 0, arr.length)
+    }
+    
     /** Returns decoded Short plus next "readable" position in target array.
      */
     def decodeShortFrom(arr: Array[Byte], i: Int): Short = {
@@ -59,43 +64,48 @@ package binary {
       fst | snd | thrd | frth
     }
 
+    def encodeByte(arr: Array[Byte], value: Byte): Array[Byte] = {
+      arr(0) = value
+      arr
+    }
+    
     /** Returns next "writeable" position in target array.
      */
-    def encodeShortTo(arr: Array[Byte], i: Int, value: Short): Int = {
+    def encodeShort(arr: Array[Byte], value: Short): Array[Byte] = {
       val fst = (value >>> 8 & 0xff).asInstanceOf[Byte]
       val snd = (value & 0xff).asInstanceOf[Byte]
-      arr(i) = fst
-      arr(i+1) = snd
-      i+2
+      arr(0) = fst
+      arr(1) = snd
+      arr
     }
 
     /** Returns next "writeable" position in target array.
      */
-    def encodeCharTo(arr: Array[Byte], i: Int, value: Char): Int = {
+    def encodeChar(arr: Array[Byte], value: Char): Array[Byte] = {
       val fst = (value >>> 8 & 0xff).asInstanceOf[Byte]
       val snd = (value & 0xff).asInstanceOf[Byte]
-      arr(i) = fst
-      arr(i+1) = snd
-      i+2
+      arr(0) = fst
+      arr(1) = snd
+      arr
     }
 
     /** Returns next "writeable" position in target array.
      */
-    def encodeIntTo(arr: Array[Byte], i: Int, value: Int): Int = {
+    def encodeInt(arr: Array[Byte], value: Int): Array[Byte] = {
       val fst = (value >>> 24).asInstanceOf[Byte]
       val snd = (value >>> 16 & 0xff).asInstanceOf[Byte]
       val thrd = (value >>> 8 & 0xff).asInstanceOf[Byte]
       val frth = (value & 0xff).asInstanceOf[Byte]
-      arr(i) = fst
-      arr(i+1) = snd
-      arr(i+2) = thrd
-      arr(i+3) = frth
-      i+4
+      arr(0) = fst
+      arr(1) = snd
+      arr(2) = thrd
+      arr(3) = frth
+      arr
     }
 
     /** Returns next "writeable" position in target array.
      */
-    def encodeLongTo(arr: Array[Byte], i: Int, value: Long): Int = {
+    def encodeLong(arr: Array[Byte], value: Long): Array[Byte] = {
       val elem1 = (value >>> 56 & 0xff).asInstanceOf[Byte]
       val elem2 = (value >>> 48 & 0xff).asInstanceOf[Byte]
       val elem3 = (value >>> 40 & 0xff).asInstanceOf[Byte]
@@ -104,49 +114,15 @@ package binary {
       val elem6 = (value >>> 16 & 0xff).asInstanceOf[Byte]
       val elem7 = (value >>> 8 & 0xff).asInstanceOf[Byte]
       val elem8 = (value & 0xff).asInstanceOf[Byte]
-      arr(i) = elem1
-      arr(i+1) = elem2
-      arr(i+2) = elem3
-      arr(i+3) = elem4
-      arr(i+4) = elem5
-      arr(i+5) = elem6
-      arr(i+6) = elem7
-      arr(i+7) = elem8
-      i+8
-    }
-
-    def fastencodeIntTo(arr: Array[Byte], i: Int, value: Int): Int = {
-      val fst = (value >>> 24).asInstanceOf[Byte]
-      val snd = (value >>> 16 & 0xff).asInstanceOf[Byte]
-      val thrd = (value >>> 8 & 0xff).asInstanceOf[Byte]
-      val frth = (value & 0xff).asInstanceOf[Byte]
-      putInt(arr, i, fst)
-      putInt(arr, i+1, snd)
-      putInt(arr, i+2, thrd)
-      putInt(arr, i+3, frth)
-      i+4
-    }
-
-    def encodeIntTo(buf: Buffer[Byte], i: Int, value: Int): Unit = {
-      val fst = (value >>> 24).asInstanceOf[Byte]
-      val snd = (value >>> 16 & 0xff).asInstanceOf[Byte]
-      val thrd = (value >>> 8 & 0xff).asInstanceOf[Byte]
-      val frth = (value & 0xff).asInstanceOf[Byte]
-      buf(i) = fst
-      buf(i+1) = snd
-      buf(i+2) = thrd
-      buf(i+3) = frth
-    }
-
-    def encodeIntTo(buf: Buffer[Byte], value: Int): Unit = {
-      val fst = (value >>> 24).asInstanceOf[Byte]
-      val snd = (value >>> 16 & 0xff).asInstanceOf[Byte]
-      val thrd = (value >>> 8 & 0xff).asInstanceOf[Byte]
-      val frth = (value & 0xff).asInstanceOf[Byte]
-      buf += fst
-      buf += snd
-      buf += thrd
-      buf += frth
+      arr(0) = elem1
+      arr(1) = elem2
+      arr(2) = elem3
+      arr(3) = elem4
+      arr(4) = elem5
+      arr(5) = elem6
+      arr(6) = elem7
+      arr(7) = elem8
+      arr
     }
 
     def decodeBooleanFrom(arr: Array[Byte], i: Int): Boolean = {
@@ -157,19 +133,9 @@ package binary {
       getInt(arr, i) != 0
     }
 
-    def encodeBooleanTo(arr: Array[Byte], i: Int, value: Boolean): Int = {
-      arr(i) = if (value) 1 else 0
-      i + 1
-    }
-
-    def fastencodeBooleanTo(arr: Array[Byte], i: Int, value: Boolean): Int = {
-      putInt(arr, i, if (value) 1 else 0)
-      i + 1
-    }
-
-    def encodeBooleanTo(buf: Buffer[Byte], i: Int, value: Boolean): Int = {
-      buf += (if (value) 1 else 0)
-      i + 1
+    def encodeBoolean(arr: Array[Byte], value: Boolean): Array[Byte] = {
+      arr(0) = if (value) 1 else 0
+      arr
     }
 
     def readBytesFrom(arr: Array[Byte], i: Int, len: Int): Array[Byte] = {
@@ -190,33 +156,6 @@ package binary {
       val bytes = Array.ofDim[Byte](len)
       Array.copy(arr, i + 4, bytes, 0, len)
       (new String(bytes, "UTF-8"), i + 4 + len)
-    }
-
-    def encodeStringTo(arr: Array[Byte], i: Int, value: String): Int = {
-      val bytes = value.getBytes("UTF-8")
-      // encode length
-      val next = encodeIntTo(arr, i, bytes.length)
-      // encode bytes of string at `next` position
-      Util.copy(arr, next, bytes)
-      next + bytes.length
-    }
-
-    def fastencodeStringTo(arr: Array[Byte], i: Int, value: String): Int = {
-      val bytes = value.getBytes("UTF-8")
-      // encode length
-      val next = fastencodeIntTo(arr, i, bytes.length)
-      // encode bytes of string at `next` position
-      Util.copy(arr, next, bytes)
-      next + bytes.length
-    }
-
-    def encodeStringTo(buf: Buffer[Byte], i: Int, value: String): Int = {
-      val bytes = value.getBytes("UTF-8")
-      // encode length
-      encodeIntTo(buf, bytes.length) // requires 4 bytes
-      // append bytes of string to `buf`
-      buf ++= bytes
-      i + 4 + bytes.length
     }
 
   }
