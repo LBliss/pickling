@@ -20,31 +20,31 @@ package binary {
   final class BinaryPickleBuilder(format: BinaryPickleFormat, out: EncodingOutput[Array[Byte]]) extends PBuilder with PickleTools {
     import format._
 
-    private var byteBuffer: EncodingOutput[Array[Byte]] =
+    private var BinaryEncoder: EncodingOutput[Array[Byte]] =
       out.asInstanceOf[EncodingOutput[Array[Byte]]]
 
     private var pos = 0
 
-    @inline private[this] def mkByteBuffer(knownSize: Int): Unit =
-      if (byteBuffer == null) {
-        byteBuffer = if (knownSize != -1) new ByteArray(knownSize) else new ByteArrayBuffer
+    @inline private[this] def mkBinaryEncoder(knownSize: Int): Unit =
+      if (BinaryEncoder == null) {
+        BinaryEncoder = if (knownSize != -1) new ByteArrayBinaryEncoder(knownSize) else new ArrayBufferBinaryEncoder
       }
 
     @inline def beginEntry(picklee: Any): PBuilder = withHints { hints =>
-      mkByteBuffer(hints.knownSize)
+      mkBinaryEncoder(hints.knownSize)
 
       if (picklee == null) {
-        pos = byteBuffer.encodeByteTo(pos, NULL_TAG)
+        pos = BinaryEncoder.encodeByteTo(pos, NULL_TAG)
       } else if (hints.oid != -1) {
-        byteBuffer.encodeByteTo(pos, REF_TAG)
-        byteBuffer.encodeIntAtEnd(pos + 1, hints.oid)
+        BinaryEncoder.encodeByteTo(pos, REF_TAG)
+        BinaryEncoder.encodeIntAtEnd(pos + 1, hints.oid)
         pos = pos + 5
       } else {
         if (!hints.isElidedType) {
           val tpeBytes = hints.tag.key.getBytes("UTF-8")
-          byteBuffer.encodeIntAtEnd(pos, tpeBytes.length)
+          BinaryEncoder.encodeIntAtEnd(pos, tpeBytes.length)
           pos += 4
-          pos = byteBuffer.copyTo(pos, tpeBytes)
+          pos = BinaryEncoder.copyTo(pos, tpeBytes)
         }
 
         // NOTE: it looks like we don't have to write object ids at all
@@ -54,52 +54,52 @@ package binary {
 
         pos = hints.tag.key match { // PERF: should store typestring once in hints.
           case KEY_NULL =>
-            byteBuffer.encodeByteTo(pos, NULL_TAG)
+            BinaryEncoder.encodeByteTo(pos, NULL_TAG)
           case KEY_BYTE =>
-            byteBuffer.encodeByteAtEnd(pos, picklee.asInstanceOf[Byte])
+            BinaryEncoder.encodeByteAtEnd(pos, picklee.asInstanceOf[Byte])
             pos + 1
           case KEY_SHORT =>
-            byteBuffer.encodeShortAtEnd(pos, picklee.asInstanceOf[Short])
+            BinaryEncoder.encodeShortAtEnd(pos, picklee.asInstanceOf[Short])
             pos + 2
           case KEY_CHAR =>
-            byteBuffer.encodeCharAtEnd(pos, picklee.asInstanceOf[Char])
+            BinaryEncoder.encodeCharAtEnd(pos, picklee.asInstanceOf[Char])
             pos + 2
           case KEY_INT =>
-            byteBuffer.encodeIntAtEnd(pos, picklee.asInstanceOf[Int])
+            BinaryEncoder.encodeIntAtEnd(pos, picklee.asInstanceOf[Int])
             pos + 4
           case KEY_LONG =>
-            byteBuffer.encodeLongAtEnd(pos, picklee.asInstanceOf[Long])
+            BinaryEncoder.encodeLongAtEnd(pos, picklee.asInstanceOf[Long])
             pos + 8
           case KEY_BOOLEAN =>
-            byteBuffer.encodeBooleanTo(pos, picklee.asInstanceOf[Boolean])
+            BinaryEncoder.encodeBooleanTo(pos, picklee.asInstanceOf[Boolean])
           case KEY_FLOAT =>
             val intValue = java.lang.Float.floatToRawIntBits(picklee.asInstanceOf[Float])
-            byteBuffer.encodeIntAtEnd(pos, intValue)
+            BinaryEncoder.encodeIntAtEnd(pos, intValue)
             pos + 4
           case KEY_DOUBLE =>
             val longValue = java.lang.Double.doubleToRawLongBits(picklee.asInstanceOf[Double])
-            byteBuffer.encodeLongAtEnd(pos, longValue)
+            BinaryEncoder.encodeLongAtEnd(pos, longValue)
             pos + 8
           case KEY_SCALA_STRING | KEY_JAVA_STRING =>
-            byteBuffer.encodeStringTo(pos, picklee.asInstanceOf[String])
+            BinaryEncoder.encodeStringTo(pos, picklee.asInstanceOf[String])
           case KEY_ARRAY_BYTE =>
-            byteBuffer.encodeByteArrayTo(pos, picklee.asInstanceOf[Array[Byte]])
+            BinaryEncoder.encodeByteArrayTo(pos, picklee.asInstanceOf[Array[Byte]])
           case KEY_ARRAY_CHAR =>
-            byteBuffer.encodeCharArrayTo(pos, picklee.asInstanceOf[Array[Char]])
+            BinaryEncoder.encodeCharArrayTo(pos, picklee.asInstanceOf[Array[Char]])
           case KEY_ARRAY_SHORT =>
-            byteBuffer.encodeShortArrayTo(pos, picklee.asInstanceOf[Array[Short]])
+            BinaryEncoder.encodeShortArrayTo(pos, picklee.asInstanceOf[Array[Short]])
           case KEY_ARRAY_INT =>
-            byteBuffer.encodeIntArrayTo(pos, picklee.asInstanceOf[Array[Int]])
+            BinaryEncoder.encodeIntArrayTo(pos, picklee.asInstanceOf[Array[Int]])
           case KEY_ARRAY_LONG =>
-            byteBuffer.encodeLongArrayTo(pos, picklee.asInstanceOf[Array[Long]])
+            BinaryEncoder.encodeLongArrayTo(pos, picklee.asInstanceOf[Array[Long]])
           case KEY_ARRAY_BOOLEAN =>
-            byteBuffer.encodeBooleanArrayTo(pos, picklee.asInstanceOf[Array[Boolean]])
+            BinaryEncoder.encodeBooleanArrayTo(pos, picklee.asInstanceOf[Array[Boolean]])
           case KEY_ARRAY_FLOAT =>
-            byteBuffer.encodeFloatArrayTo(pos, picklee.asInstanceOf[Array[Float]])
+            BinaryEncoder.encodeFloatArrayTo(pos, picklee.asInstanceOf[Array[Float]])
           case KEY_ARRAY_DOUBLE =>
-            byteBuffer.encodeDoubleArrayTo(pos, picklee.asInstanceOf[Array[Double]])
+            BinaryEncoder.encodeDoubleArrayTo(pos, picklee.asInstanceOf[Array[Double]])
           case _ =>
-            if (hints.isElidedType) byteBuffer.encodeByteTo(pos, ELIDED_TAG)
+            if (hints.isElidedType) BinaryEncoder.encodeByteTo(pos, ELIDED_TAG)
             else pos
         }
       }
@@ -119,7 +119,7 @@ package binary {
 
     @inline def beginCollection(length: Int): PBuilder = {
       beginCollPos = pos :: beginCollPos
-      byteBuffer.encodeIntAtEnd(pos, 0)
+      BinaryEncoder.encodeIntAtEnd(pos, 0)
       pos += 4
       this
     }
@@ -132,18 +132,18 @@ package binary {
     @inline def endCollection(length: Int): Unit = {
       val localBeginCollPos = beginCollPos.head
       beginCollPos = beginCollPos.tail
-      byteBuffer.encodeIntTo(localBeginCollPos, length)
+      BinaryEncoder.encodeIntTo(localBeginCollPos, length)
     }
 
     @inline def result() = {
-      BinaryPickle(byteBuffer.result())
+      BinaryPickle(BinaryEncoder.result())
     }
   }
 
   class BinaryPickleReader(arr: Array[Byte], val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
     import format._
 
-    private val byteBuffer: ByteBuffer       = new ByteArray(arr)
+    private val BinaryEncoder: BinaryEncoder       = new ByteArrayBinaryEncoder(arr)
     private var pos                          = 0
     private var _lastTagRead: FastTypeTag[_] = null
     private var _lastTypeStringRead: String  = null
@@ -160,7 +160,7 @@ package binary {
     def beginEntryNoTag(): String = {
       val res: Any = withHints { hints =>
         if (hints.isElidedType && nullablePrimitives.contains(hints.tag.key)) {
-          val lookahead = byteBuffer.decodeByteFrom(pos)
+          val lookahead = BinaryEncoder.decodeByteFrom(pos)
           lookahead match {
             case NULL_TAG => pos += 1; FastTypeTag.Null
             case REF_TAG  => pos += 1; FastTypeTag.Ref
@@ -169,7 +169,7 @@ package binary {
         } else if (hints.isElidedType && primitives.contains(hints.tag.key)) {
           hints.tag
         } else {
-          val lookahead = byteBuffer.decodeByteFrom(pos)
+          val lookahead = BinaryEncoder.decodeByteFrom(pos)
           lookahead match {
             case NULL_TAG =>
               pos += 1
@@ -181,7 +181,7 @@ package binary {
               pos += 1
               FastTypeTag.Ref
             case _ =>
-              val (typeString, newpos) = byteBuffer.decodeStringFrom(pos)
+              val (typeString, newpos) = BinaryEncoder.decodeStringFrom(pos)
               pos = newpos
               typeString
           }
@@ -208,32 +208,32 @@ package binary {
       var newpos = pos
       val res = lastTagRead.key match {
           case KEY_NULL    => null
-          case KEY_REF     => newpos = pos+4 ; lookupUnpicklee(byteBuffer.decodeIntFrom(pos))
-          case KEY_BYTE    => newpos = pos+1 ; byteBuffer.decodeByteFrom(pos)
-          case KEY_SHORT   => newpos = pos+2 ; byteBuffer.decodeShortFrom(pos)
-          case KEY_CHAR    => newpos = pos+2 ; byteBuffer.decodeCharFrom(pos)
-          case KEY_INT     => newpos = pos+4 ; byteBuffer.decodeIntFrom(pos)
-          case KEY_LONG    => newpos = pos+8 ; byteBuffer.decodeLongFrom(pos)
-          case KEY_BOOLEAN => newpos = pos+1 ; byteBuffer.decodeBooleanFrom(pos)
+          case KEY_REF     => newpos = pos+4 ; lookupUnpicklee(BinaryEncoder.decodeIntFrom(pos))
+          case KEY_BYTE    => newpos = pos+1 ; BinaryEncoder.decodeByteFrom(pos)
+          case KEY_SHORT   => newpos = pos+2 ; BinaryEncoder.decodeShortFrom(pos)
+          case KEY_CHAR    => newpos = pos+2 ; BinaryEncoder.decodeCharFrom(pos)
+          case KEY_INT     => newpos = pos+4 ; BinaryEncoder.decodeIntFrom(pos)
+          case KEY_LONG    => newpos = pos+8 ; BinaryEncoder.decodeLongFrom(pos)
+          case KEY_BOOLEAN => newpos = pos+1 ; BinaryEncoder.decodeBooleanFrom(pos)
           case KEY_FLOAT   =>
-            val r = byteBuffer.decodeIntFrom(pos)
+            val r = BinaryEncoder.decodeIntFrom(pos)
             newpos = pos+4
             java.lang.Float.intBitsToFloat(r)
           case KEY_DOUBLE  =>
-            val r = byteBuffer.decodeLongFrom(pos)
+            val r = BinaryEncoder.decodeLongFrom(pos)
             newpos = pos+8
             java.lang.Double.longBitsToDouble(r)
 
-          case KEY_SCALA_STRING | KEY_JAVA_STRING => val r = byteBuffer.decodeStringFrom(pos); newpos = r._2 ; r._1
+          case KEY_SCALA_STRING | KEY_JAVA_STRING => val r = BinaryEncoder.decodeStringFrom(pos); newpos = r._2 ; r._1
 
-          case KEY_ARRAY_BYTE => val r = byteBuffer.decodeByteArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_SHORT => val r = byteBuffer.decodeShortArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_CHAR => val r = byteBuffer.decodeCharArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_INT => val r = byteBuffer.decodeIntArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_LONG => val r = byteBuffer.decodeLongArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_BOOLEAN => val r = byteBuffer.decodeBooleanArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_FLOAT => val r = byteBuffer.decodeFloatArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_DOUBLE => val r = byteBuffer.decodeDoubleArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_BYTE => val r = BinaryEncoder.decodeByteArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_SHORT => val r = BinaryEncoder.decodeShortArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_CHAR => val r = BinaryEncoder.decodeCharArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_INT => val r = BinaryEncoder.decodeIntArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_LONG => val r = BinaryEncoder.decodeLongArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_BOOLEAN => val r = BinaryEncoder.decodeBooleanArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_FLOAT => val r = BinaryEncoder.decodeFloatArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_DOUBLE => val r = BinaryEncoder.decodeDoubleArrayFrom(pos); newpos = r._2 ; r._1
       }
 
       pos = newpos
@@ -250,7 +250,7 @@ package binary {
     def beginCollection(): PReader = this
 
     def readLength(): Int = {
-      val length = byteBuffer.decodeIntFrom(pos)
+      val length = BinaryEncoder.decodeIntFrom(pos)
       pos += 4
       length
     }
