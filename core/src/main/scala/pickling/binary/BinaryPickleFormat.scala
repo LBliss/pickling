@@ -330,7 +330,7 @@ package binary {
         java.lang.Float.intBitsToFloat(r)
       case KEY_DOUBLE =>
         streamRead(8)
-        val r = Util.decodeInt(buffer4)
+        val r = Util.decodeLong(buffer8)
         java.lang.Double.longBitsToDouble(r)
 
       case KEY_SCALA_STRING | KEY_JAVA_STRING =>
