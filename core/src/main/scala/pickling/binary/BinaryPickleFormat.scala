@@ -137,7 +137,7 @@ package binary {
     @inline def endCollection(length: Int): Unit = {
       val localBeginCollPos = beginCollPos.head
       beginCollPos = beginCollPos.tail
-      byteBuffer.encodeIntTo(localBeginCollPos, length)
+      // byteBuffer.encodeIntTo(localBeginCollPos, length)
     }
 
     @inline def result() = {
