@@ -23,7 +23,7 @@ class FileIOTest extends FunSuite {
 
     val fileContents = Source.fromFile(tmpFile).getLines.mkString("\n")
 
-    assert(fileContents == p.pickle.value)
+    assert(fileContents == p.pickle.toString)
   }
 
   test("simple-w-collection") {
@@ -37,7 +37,7 @@ class FileIOTest extends FunSuite {
 
     val fileContents = Source.fromFile(tmpFile).getLines.mkString("\n")
 
-    assert(fileContents == p.pickle.value)
+    assert(fileContents == p.pickle.toString)
   }
 
   test("simple-w-collection-using-builder-directly") {
