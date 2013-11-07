@@ -123,7 +123,7 @@ package binary {
           case KEY_ARRAY_CHAR =>
             val src = picklee.asInstanceOf[Array[Char]]
             out.put(Util.encodeInt(buffer4, src.length))
-            bufferN = new Array[Byte](src.length*4)
+            bufferN = new Array[Byte](src.length*2)
             UnsafeMemory.unsafe.copyMemory(src, UnsafeMemory.charArrayOffset, bufferN, UnsafeMemory.byteArrayOffset, bufferN.length)
             out.put(bufferN)
           case KEY_ARRAY_SHORT =>
@@ -355,10 +355,10 @@ package binary {
       case KEY_ARRAY_CHAR =>
         streamRead(4)
         val len = Util.decodeInt(buffer4)
-        bufferN = new Array[Byte](len * 4)
+        bufferN = new Array[Byte](len * 2)
         input.read(bufferN)
         val ia = Array.ofDim[Char](len)
-        UnsafeMemory.unsafe.copyMemory(bufferN, UnsafeMemory.byteArrayOffset, ia, UnsafeMemory.charArrayOffset, len * 4)
+        UnsafeMemory.unsafe.copyMemory(bufferN, UnsafeMemory.byteArrayOffset, ia, UnsafeMemory.charArrayOffset, len * 2)
         ia
       case KEY_ARRAY_INT =>
         streamRead(4)
