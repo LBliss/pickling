@@ -2,6 +2,7 @@ package scala.pickling
 
 import scala.pickling.internal._
 import scala.language.implicitConversions
+import scala.reflect.runtime.universe.Mirror
 
 package object json {
   implicit val pickleFormat: JSONPickleFormat = new JSONPickleFormat
@@ -9,8 +10,6 @@ package object json {
 }
 
 package json {
-  import scala.reflect.runtime.universe._
-  import definitions._
   import scala.util.parsing.json._
   import scala.collection.mutable.{StringBuilder, Stack}
 

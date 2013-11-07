@@ -6,8 +6,6 @@ import java.io.FileInputStream
 
 trait Input[T] {
 
-  // Side-effect read.
-  def read(obj: T): Unit
   // Direct read.
   def read(): T
   
@@ -17,12 +15,16 @@ trait Input[T] {
 
 trait BinaryInput extends Input[Array[Byte]] {
   
+  // Side-effect read.
   def read(obj: Array[Byte]): Unit
   
+  // Side-effect read.
   def read(obj: Array[Byte], off: Int, len: Int): Unit
   
+  // Read a single byte.
   def readByte(): Byte
   
+  // Must use previous reads.
   def read(): Array[Byte] = ???
 }
 
