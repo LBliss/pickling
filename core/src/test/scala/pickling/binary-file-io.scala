@@ -3,7 +3,6 @@ package scala.pickling.binaryfileio
 import org.scalatest.FunSuite
 import java.io._
 
-import scala.io.Source
 import scala.pickling._
 import scala.pickling.binary._
 
@@ -23,9 +22,11 @@ class BinaryFileIOTest extends FunSuite {
     p.pickleTo(fileOut)
     fileOut.close()
 
-    val fileContents = Source.fromFile(tmpFile).getLines.mkString("\n")
+    val bis = new BufferedInputStream(new FileInputStream(tmpFile))
+    val fileContents = Stream.continually(bis.read).takeWhile(_ != -1).map(_.toByte).toList
+    bis.close()
     
-    assert(fileContents.getBytes("UTF-8").toList == p.pickle.value.toList)
+    assert(fileContents == p.pickle.value.toList)
   }
 
   test("simple-w-collection") {
