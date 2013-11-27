@@ -12,28 +12,53 @@ trait Output[T] {
 // in JSON we can demand Output[String], since Output[Nothing] <: Output[String]
 
 
-// encoded primitives: Byte, Short, Char, Int, Long, Boolean, String
-// encoded primitive arrays: Array[Byte], Array[Int]
-
-trait EncodingOutput[T] extends Output[T] {
-  def encodeByteTo(pos: Int, value: Byte): Unit
-  def encodeShortTo(pos: Int, value: Short): Unit
-  def encodeCharTo(pos: Int, value: Char): Unit
-  def encodeIntTo(pos: Int, value: Int): Unit
-  def encodeLongTo(pos: Int, value: Long): Unit
-  def encodeBooleanTo(pos: Int, value: Boolean): Unit
-  def encodeStringTo(pos: Int, value: String): Int
-  def encodeByteArrayTo(pos: Int, ia: Array[Byte]): Int
-  def encodeShortArrayTo(pos: Int, ia: Array[Short]): Int
-  def encodeCharArrayTo(pos: Int, ia: Array[Char]): Int
-  def encodeIntArrayTo(pos: Int, ia: Array[Int]): Int
-  def encodeLongArrayTo(pos: Int, ia: Array[Long]): Int
-  def encodeBooleanArrayTo(pos: Int, ia: Array[Boolean]): Int
-  def encodeFloatArrayTo(pos: Int, ia: Array[Float]): Int
-  def encodeDoubleArrayTo(pos: Int, ia: Array[Double]): Int
-  def copyTo(pos: Int, bytes: Array[Byte]): Unit
+trait ArrayOutput[T] extends Output[Array[T]] {
+  // Put a single T
+  def +=(obj: T): Unit
+  
 }
 
+import scala.collection.mutable.ArrayBuffer
+
+class ByteArrayBufferOutput extends ArrayOutput[Byte] {
+
+  private val buf =
+    ArrayBuffer[Byte]()
+    
+  def result(): Array[Byte] =
+    buf.toArray
+  
+  def +=(obj: Byte) =
+    buf += obj
+  
+  def put(obj: Array[Byte]): this.type = {
+    buf ++= obj
+    this
+  }
+  
+}
+
+class ByteArrayOutput(len: Int) extends ArrayOutput[Byte]  {
+
+  private var pos = 0
+  private val arr = Array.ofDim[Byte](len)
+  
+  def result(): Array[Byte] =
+    arr
+  
+  def +=(obj: Byte) = {
+    arr(pos) = obj
+    pos = pos + 1
+  }
+  
+  def put(obj: Array[Byte]): this.type = {
+    Array.copy(obj, 0, arr, pos, obj.length)
+    //binary.Util.UnsafeMemory.unsafe.copyMemory(obj, srcOffset, arr, destOffset + i + 4, obj.length * 1)
+    pos = pos + obj.length
+    this
+  }
+  
+}
 
 class StringOutput extends Output[String] {
 
@@ -49,5 +74,5 @@ class StringOutput extends Output[String] {
   }
 
   override def toString = buf.toString
-
+  
 }
