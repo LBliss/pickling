@@ -143,7 +143,6 @@ package binary {
   class BinaryPickleReader(arr: Array[Byte], val mirror: Mirror, format: BinaryPickleFormat) extends PReader with PickleTools {
     import format._
 
-    private val byteBuffer: ByteBuffer       = new ByteArray(arr)
     private var pos                          = 0
     private var _lastTagRead: FastTypeTag[_] = null
     private var _lastTypeStringRead: String  = null
@@ -160,7 +159,7 @@ package binary {
     def beginEntryNoTag(): String = {
       val res: Any = withHints { hints =>
         if (hints.isElidedType && nullablePrimitives.contains(hints.tag.key)) {
-          val lookahead = byteBuffer.decodeByteFrom(pos)
+          val lookahead = arr(pos)
           lookahead match {
             case NULL_TAG => pos += 1; FastTypeTag.Null
             case REF_TAG  => pos += 1; FastTypeTag.Ref
@@ -169,7 +168,7 @@ package binary {
         } else if (hints.isElidedType && primitives.contains(hints.tag.key)) {
           hints.tag
         } else {
-          val lookahead = byteBuffer.decodeByteFrom(pos)
+          val lookahead = arr(pos)
           lookahead match {
             case NULL_TAG =>
               pos += 1
@@ -181,7 +180,7 @@ package binary {
               pos += 1
               FastTypeTag.Ref
             case _ =>
-              val (typeString, newpos) = byteBuffer.decodeStringFrom(pos)
+              val (typeString, newpos) = Util.decodeStringFrom(arr, pos)
               pos = newpos
               typeString
           }
@@ -208,32 +207,32 @@ package binary {
       var newpos = pos
       val res = lastTagRead.key match {
           case KEY_NULL    => null
-          case KEY_REF     => newpos = pos+4 ; lookupUnpicklee(byteBuffer.decodeIntFrom(pos))
-          case KEY_BYTE    => newpos = pos+1 ; byteBuffer.decodeByteFrom(pos)
-          case KEY_SHORT   => newpos = pos+2 ; byteBuffer.decodeShortFrom(pos)
-          case KEY_CHAR    => newpos = pos+2 ; byteBuffer.decodeCharFrom(pos)
-          case KEY_INT     => newpos = pos+4 ; byteBuffer.decodeIntFrom(pos)
-          case KEY_LONG    => newpos = pos+8 ; byteBuffer.decodeLongFrom(pos)
-          case KEY_BOOLEAN => newpos = pos+1 ; byteBuffer.decodeBooleanFrom(pos)
+          case KEY_REF     => newpos = pos+4 ; lookupUnpicklee(Util.decodeIntFrom(arr, pos))
+          case KEY_BYTE    => newpos = pos+1 ; arr(pos)
+          case KEY_SHORT   => newpos = pos+2 ; Util.decodeShortFrom(arr, pos)
+          case KEY_CHAR    => newpos = pos+2 ; Util.decodeCharFrom(arr, pos)
+          case KEY_INT     => newpos = pos+4 ; Util.decodeIntFrom(arr, pos)
+          case KEY_LONG    => newpos = pos+8 ; Util.decodeLongFrom(arr, pos)
+          case KEY_BOOLEAN => newpos = pos+1 ; Util.decodeBooleanFrom(arr, pos)
           case KEY_FLOAT   =>
-            val r = byteBuffer.decodeIntFrom(pos)
+            val r = Util.decodeIntFrom(arr, pos)
             newpos = pos+4
             java.lang.Float.intBitsToFloat(r)
           case KEY_DOUBLE  =>
-            val r = byteBuffer.decodeLongFrom(pos)
+            val r = Util.decodeLongFrom(arr, pos)
             newpos = pos+8
             java.lang.Double.longBitsToDouble(r)
 
-          case KEY_SCALA_STRING | KEY_JAVA_STRING => val r = byteBuffer.decodeStringFrom(pos); newpos = r._2 ; r._1
+          case KEY_SCALA_STRING | KEY_JAVA_STRING => val r = Util.decodeStringFrom(arr, pos); newpos = r._2 ; r._1
 
-          case KEY_ARRAY_BYTE => val r = byteBuffer.decodeByteArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_SHORT => val r = byteBuffer.decodeShortArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_CHAR => val r = byteBuffer.decodeCharArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_INT => val r = byteBuffer.decodeIntArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_LONG => val r = byteBuffer.decodeLongArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_BOOLEAN => val r = byteBuffer.decodeBooleanArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_FLOAT => val r = byteBuffer.decodeFloatArrayFrom(pos); newpos = r._2 ; r._1
-          case KEY_ARRAY_DOUBLE => val r = byteBuffer.decodeDoubleArrayFrom(pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_BYTE => val r = Util.decodeByteArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_SHORT => val r = Util.decodeShortArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_CHAR => val r = Util.decodeCharArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_INT => val r = Util.decodeIntArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_LONG => val r = Util.decodeLongArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_BOOLEAN => val r = Util.decodeBooleanArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_FLOAT => val r = Util.decodeFloatArrayFrom(arr, pos); newpos = r._2 ; r._1
+          case KEY_ARRAY_DOUBLE => val r = Util.decodeDoubleArrayFrom(arr, pos); newpos = r._2 ; r._1
       }
 
       pos = newpos
@@ -250,7 +249,7 @@ package binary {
     def beginCollection(): PReader = this
 
     def readLength(): Int = {
-      val length = byteBuffer.decodeIntFrom(pos)
+      val length = Util.decodeIntFrom(arr, pos)
       pos += 4
       length
     }

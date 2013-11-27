@@ -36,36 +36,6 @@ sealed abstract class ByteBuffer extends EncodingOutput[Array[Byte]] {
 
   def copyTo(pos: Int, bytes: Array[Byte]): Unit
 
-  def decodeByteFrom(pos: Int): Byte
-
-  def decodeShortFrom(pos: Int): Short
-
-  def decodeCharFrom(pos: Int): Char
-
-  def decodeIntFrom(pos: Int): Int
-
-  def decodeLongFrom(pos: Int): Long
-
-  def decodeStringFrom(pos: Int): (String, Int)
-
-  def decodeBooleanFrom(pos: Int): Boolean
-
-  def decodeByteArrayFrom(pos: Int): (Array[Byte], Int)
-
-  def decodeShortArrayFrom(pos: Int): (Array[Short], Int)
-
-  def decodeCharArrayFrom(pos: Int): (Array[Char], Int)
-
-  def decodeIntArrayFrom(pos: Int): (Array[Int], Int)
-
-  def decodeLongArrayFrom(pos: Int): (Array[Long], Int)
-
-  def decodeBooleanArrayFrom(pos: Int): (Array[Boolean], Int)
-
-  def decodeFloatArrayFrom(pos: Int): (Array[Float], Int)
-
-  def decodeDoubleArrayFrom(pos: Int): (Array[Double], Int)
-
   def toArray: Array[Byte]
 
   def result(): Array[Byte] =
@@ -130,51 +100,6 @@ final class ByteArray(arr: Array[Byte]) extends ByteBuffer {
 
   def copyTo(pos: Int, bytes: Array[Byte]): Unit =
     Util.copy(arr, pos, bytes)
-
-  def decodeByteFrom(pos: Int): Byte =
-    arr(pos)
-
-  def decodeShortFrom(pos: Int): Short =
-    Util.decodeShortFrom(arr, pos)
-
-  def decodeCharFrom(pos: Int): Char =
-    Util.decodeCharFrom(arr, pos)
-
-  def decodeIntFrom(pos: Int): Int =
-    Util.decodeIntFrom(arr, pos)
-
-  def decodeLongFrom(pos: Int): Long =
-    Util.decodeLongFrom(arr, pos)
-
-  def decodeStringFrom(pos: Int): (String, Int) =
-    Util.decodeStringFrom(arr, pos)
-
-  def decodeBooleanFrom(pos: Int): Boolean =
-    Util.decodeBooleanFrom(arr, pos)
-
-  def decodeByteArrayFrom(pos: Int): (Array[Byte], Int) =
-    Util.decodeByteArrayFrom(arr, pos)
-
-  def decodeShortArrayFrom(pos: Int): (Array[Short], Int) =
-    Util.decodeShortArrayFrom(arr, pos)
-
-  def decodeCharArrayFrom(pos: Int): (Array[Char], Int) =
-    Util.decodeCharArrayFrom(arr, pos)
-
-  def decodeIntArrayFrom(pos: Int): (Array[Int], Int) =
-    Util.decodeIntArrayFrom(arr, pos)
-
-  def decodeLongArrayFrom(pos: Int): (Array[Long], Int) =
-    Util.decodeLongArrayFrom(arr, pos)
-
-  def decodeBooleanArrayFrom(pos: Int): (Array[Boolean], Int) =
-    Util.decodeBooleanArrayFrom(arr, pos)
-
-  def decodeFloatArrayFrom(pos: Int): (Array[Float], Int) =
-    Util.decodeFloatArrayFrom(arr, pos)
-
-  def decodeDoubleArrayFrom(pos: Int): (Array[Double], Int) =
-    Util.decodeDoubleArrayFrom(arr, pos)
 
   def toArray: Array[Byte] =
     arr
@@ -311,51 +236,6 @@ final class ByteArrayBuffer extends ByteBuffer {
 
   def copyTo(pos: Int, bytes: Array[Byte]): Unit =
     buf ++= bytes
-
-  def decodeByteFrom(pos: Int): Byte =
-    ???
-
-  def decodeShortFrom(pos: Int): Short =
-    ???
-
-  def decodeCharFrom(pos: Int): Char =
-    ???
-
-  def decodeIntFrom(pos: Int): Int =
-    ???
-
-  def decodeLongFrom(pos: Int): Long =
-    ???
-
-  def decodeStringFrom(pos: Int): (String, Int) =
-    ???
-
-  def decodeBooleanFrom(pos: Int): Boolean =
-    ???
-
-  def decodeByteArrayFrom(pos: Int): (Array[Byte], Int) =
-    ???
-
-  def decodeShortArrayFrom(pos: Int): (Array[Short], Int) =
-    ???
-
-  def decodeCharArrayFrom(pos: Int): (Array[Char], Int) =
-    ???
-
-  def decodeIntArrayFrom(pos: Int): (Array[Int], Int) =
-    ???
-
-  def decodeLongArrayFrom(pos: Int): (Array[Long], Int) =
-    ???
-
-  def decodeBooleanArrayFrom(pos: Int): (Array[Boolean], Int) =
-    ???
-
-  def decodeFloatArrayFrom(pos: Int): (Array[Float], Int) =
-    ???
-
-  def decodeDoubleArrayFrom(pos: Int): (Array[Double], Int) =
-    ???
 
   def toArray: Array[Byte] =
     buf.toArray
